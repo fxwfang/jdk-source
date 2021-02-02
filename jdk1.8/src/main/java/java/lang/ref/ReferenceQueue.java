@@ -70,7 +70,7 @@ public class ReferenceQueue<T> {
             if (r instanceof FinalReference) {
                 sun.misc.VM.addFinalRefCount(1);
             }
-            lock.notifyAll();
+            lock.notifyAll(); // 唤醒消费线程
             return true;
         }
     }

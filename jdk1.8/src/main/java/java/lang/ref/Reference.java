@@ -36,7 +36,7 @@ import sun.misc.Cleaner;
  * @author   Mark Reinhold
  * @since    1.2
  */
-
+// 特殊的类，垃圾回收的时候可以被JVM识别，可达性分析的时候，reference指向的不算
 public abstract class Reference<T> {
 
     /* A Reference instance is in one of four possible internal states:
@@ -86,9 +86,9 @@ public abstract class Reference<T> {
      * discovered objects through the discovered field. The discovered
      * field is also used for linking Reference objects in the pending list.
      */
-
+   // 保存真实对象的引用
     private T referent;         /* Treated specially by GC */
-
+   //引用队列，外部可以通过引用队列判断指定的对象是否被gc回收掉。
     volatile ReferenceQueue<? super T> queue;
 
     /* When active:   NULL
@@ -97,13 +97,13 @@ public abstract class Reference<T> {
      *    Inactive:   this
      */
     @SuppressWarnings("rawtypes")
-    Reference next;
+    Reference next;  // 指向下一个ref，单向链表
 
     /* When active:   next element in a discovered reference list maintained by GC (or this if last)
      *     pending:   next element in the pending list (or null if last)
      *   otherwise:   NULL
      */
-    transient private Reference<T> discovered;  /* used by VM */
+    transient private Reference<T> discovered;  /* used by VM 。 VM线程使用。来判定当前ref的真实对象是垃圾后，会将当前ref加入到pending队列，然后JM把discovered连接起来组成pending链表*/
 
 
     /* Object used to synchronize with the garbage collector.  The collector
@@ -120,7 +120,7 @@ public abstract class Reference<T> {
      * them.  This list is protected by the above lock object. The
      * list uses the discovered field to link its elements.
      */
-    private static Reference<Object> pending = null;
+    private static Reference<Object> pending = null;  // 全局唯一，pending链表的头对象
 
     /* High-priority thread to enqueue pending References
      */
@@ -133,7 +133,7 @@ public abstract class Reference<T> {
         public void run() {
             for (;;) {
                 Reference<Object> r;
-                synchronized (lock) {
+                synchronized (lock) { //为什么需要同步？ 1.Jvm垃圾收集线程需要向pending队列追加ref. 2,当前线程消费这个pending队列。
                     if (pending != null) {
                         r = pending;
                         pending = r.discovered;
@@ -153,26 +153,26 @@ public abstract class Reference<T> {
                         // This may lead to the VM not ever trying to load the InterruptedException
                         // class again.
                         try {
-                            try {
-                                lock.wait();
+                            try {// 没有消费数据，1，释放锁 2. 会阻塞当前线程，直到其它线程使用lock.notify或者lock.notifyAll()唤醒当前线程。
+                                lock.wait(); // 谁负责唤醒消费线程？ jvm垃圾收集器线程，jvm线程向pending队列添加新ref之后，后调用lock.notify()
                             } catch (OutOfMemoryError x) { }
                         } catch (InterruptedException x) { }
                         continue;
                     }
                 }
 
-                // Fast path for cleaners
+                // Fast path for cleaners。 Cleaner对象，当r指向的ref实例市Cleaner实例时，c
                 if (r instanceof Cleaner) {
-                    ((Cleaner)r).clean();
+                    ((Cleaner)r).clean(); //释放堆外内存？
                     continue;
                 }
-
+                //
                 ReferenceQueue<Object> q = r.queue;
                 if (q != ReferenceQueue.NULL) q.enqueue(r);
             }
         }
     }
-
+    // 启动ReferenceHandler线程，消费pending队列里面的数据
     static {
         ThreadGroup tg = Thread.currentThread().getThreadGroup();
         for (ThreadGroup tgn = tg;

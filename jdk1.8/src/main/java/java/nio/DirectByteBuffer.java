@@ -91,7 +91,7 @@ class DirectByteBuffer
                 // Paranoia
                 return;
             }
-            unsafe.freeMemory(address);
+            unsafe.freeMemory(address);//释放了内存。
             address = 0;
             Bits.unreserveMemory(size, capacity);
         }
@@ -115,7 +115,7 @@ class DirectByteBuffer
     // Primary constructor
     //
     DirectByteBuffer(int cap) {                   // package-private
-
+       // 后面的一大堆就是计算分配空间大小、分配、计算空间始址
         super(-1, 0, cap, cap);
         boolean pa = VM.isDirectMemoryPageAligned();
         int ps = Bits.pageSize();
@@ -124,7 +124,7 @@ class DirectByteBuffer
 
         long base = 0;
         try {
-            base = unsafe.allocateMemory(size);
+            base = unsafe.allocateMemory(size);//使用unsafe来分配直接内存
         } catch (OutOfMemoryError x) {
             Bits.unreserveMemory(size, cap);
             throw x;
@@ -134,9 +134,9 @@ class DirectByteBuffer
             // Round up to page boundary
             address = base + ps - (base & (ps - 1));
         } else {
-            address = base;
+             address = base;  //address是始址，可知一个DirectByteBuffer对象存储了内存始址address、内存容量capacity，这已经可以确定一块内存了，再加上position、limited、mark就可以对该内存进行缓存式的读写操作了
         }
-        cleaner = Cleaner.create(this, new Deallocator(base, size, cap));
+        cleaner = Cleaner.create(this, new Deallocator(base, size, cap));  //用于回收直接内存
         att = null;
 
 
